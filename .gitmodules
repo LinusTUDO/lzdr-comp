@@ -1,0 +1,6 @@
+[submodule "subprojects/lzd"]
+	path = subprojects/lzd
+	url = https://github.com/kg86/lzd.git
+[submodule "subprojects/tudocomp"]
+	path = subprojects/tudocomp
+	url = https://github.com/tudocomp/tudocomp.git

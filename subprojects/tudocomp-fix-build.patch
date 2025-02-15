@@ -1,0 +1,184 @@
+From 588deee4fbbb2a14cb5e4d793cb16d1b3101be75 Mon Sep 17 00:00:00 2001
+From: LG <>
+Date: Tue, 22 Oct 2024 09:33:54 +0200
+Subject: [PATCH 1/3] fix gtest cmake error during build
+
+-- GTest found
+CMake Error at cmakemodules/find_or_download_package.cmake:39 (if):
+  if given arguments:
+
+    "STREQUAL" ".a"
+
+  Unknown arguments specified
+Call Stack (most recent call first):
+  test/test/testsuite.cmake:2 (find_or_download_package)
+  test/CMakeLists.txt:1 (include)
+---
+ cmakemodules/find_or_download_package.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmakemodules/find_or_download_package.cmake b/cmakemodules/find_or_download_package.cmake
+index b684b1ef..ce833c71 100644
+--- a/cmakemodules/find_or_download_package.cmake
++++ b/cmakemodules/find_or_download_package.cmake
+@@ -36,7 +36,7 @@ function(find_or_download_package package package_found_prefix target_name)
+         # Detect wether this is a shared or a static library
+         # NB: This might not work on windows
+         get_filename_component(LIB_EXT ${sublib} EXT)
+-        if(${LIB_EXT} STREQUAL ${CMAKE_STATIC_LIBRARY_SUFFIX})
++        if("${LIB_EXT}" STREQUAL "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+             add_library(${sublib_target} IMPORTED STATIC GLOBAL)
+         else()
+             add_library(${sublib_target} IMPORTED SHARED GLOBAL)
+-- 
+2.46.0
+
+
+From 0d0ed96df033c70871824c808899903ed2cd741e Mon Sep 17 00:00:00 2001
+From: LG <>
+Date: Tue, 22 Oct 2024 12:32:29 +0200
+Subject: [PATCH 2/3] try to fix glog to use c++14
+
+---
+ CMakeLists.txt                              |  5 +++++
+ cmakemodules/find_or_download_package.cmake | 11 +++++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6d269d39..c12215aa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -18,6 +18,8 @@ if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" AND
+ endif()
+ 
+ set(CXX_STANDARD c++14)
++set(CMAKE_CXX_STANDARD 14)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+     # using Clang or AppleClang
+@@ -81,6 +83,9 @@ include(find_or_download_package)
+ 
+ # Usage: find_or_download_package(PACKAGE_NAME, FOUND_FLAG_PREFIX, TARGET_PREFIX)
+ find_or_download_package(Glog GLOG glog)
++set_property(TARGET glog PROPERTY CXX_STANDARD 14)
++set_property(TARGET glog PROPERTY CXX_STANDARD_REQUIRED ON)
++
+ find_or_download_package(SDSL SDSL sdsl)
+ 
+ include(FindJudy)
+diff --git a/cmakemodules/find_or_download_package.cmake b/cmakemodules/find_or_download_package.cmake
+index ce833c71..0b5e11cb 100644
+--- a/cmakemodules/find_or_download_package.cmake
++++ b/cmakemodules/find_or_download_package.cmake
+@@ -21,6 +21,12 @@ function(find_or_download_package package package_found_prefix target_name)
+     endif()
+ 
+     add_library(${target_name} INTERFACE)
++
++    if("${target_name}" STREQUAL glog)
++        set_property(TARGET glog PROPERTY CXX_STANDARD 14)
++        set_property(TARGET glog PROPERTY CXX_STANDARD_REQUIRED ON)
++    endif()
++
+     set_target_properties(${target_name} PROPERTIES
+         "INTERFACE_INCLUDE_DIRECTORIES" "${${package_found_prefix}_INCLUDE_DIRS}"
+     )
+@@ -42,6 +48,11 @@ function(find_or_download_package package package_found_prefix target_name)
+             add_library(${sublib_target} IMPORTED SHARED GLOBAL)
+         endif()
+ 
++        if("${target_name}" STREQUAL glog)
++            set_property(TARGET ${sublib_target} PROPERTY CXX_STANDARD 14)
++            set_property(TARGET ${sublib_target} PROPERTY CXX_STANDARD_REQUIRED ON)
++        endif()
++
+         foreach(sublib_target_dep ${${package_found_prefix}_CMAKE_DEP})
+             #message(STATUS "sublib target dep: " ${sublib_target_dep})
+             add_dependencies(${sublib_target} ${sublib_target_dep})
+-- 
+2.46.0
+
+
+From acb0dc01a1ec5548f72027cdd33cb51e50e47192 Mon Sep 17 00:00:00 2001
+From: LG <>
+Date: Tue, 22 Oct 2024 12:33:46 +0200
+Subject: [PATCH 3/3] fix version generation for paths with spaces
+
+---
+ cmakemodules/generate_tudocomp_sources.cmake | 10 +++++-----
+ etc/genversion.sh                            | 18 +++++++++---------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/cmakemodules/generate_tudocomp_sources.cmake b/cmakemodules/generate_tudocomp_sources.cmake
+index f04c259d..96fce61f 100644
+--- a/cmakemodules/generate_tudocomp_sources.cmake
++++ b/cmakemodules/generate_tudocomp_sources.cmake
+@@ -1,11 +1,11 @@
+-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/tudocomp)
++file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/include/tudocomp")
+ 
+-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/include/tudocomp/config.h.in ${CMAKE_BINARY_DIR}/include/tudocomp/config.h)
++CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/include/tudocomp/config.h.in" "${CMAKE_BINARY_DIR}/include/tudocomp/config.h")
+ 
+ add_custom_target(
+     generate_version
+-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/etc/genversion.sh ${CMAKE_BINARY_DIR}/include/tudocomp/version.hpp ${VERSION}
+-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/etc/genversion.sh
++    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/etc/genversion.sh" "${CMAKE_BINARY_DIR}/include/tudocomp/version.hpp" "${VERSION}"
++    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/etc/genversion.sh"
+ )
+ 
+-include_directories(${CMAKE_BINARY_DIR}/include)
++include_directories("${CMAKE_BINARY_DIR}/include")
+diff --git a/etc/genversion.sh b/etc/genversion.sh
+index 5296e356..cfe256ba 100755
+--- a/etc/genversion.sh
++++ b/etc/genversion.sh
+@@ -15,15 +15,15 @@ COMMITREV=$(git show --abbrev-commit HEAD | head -n 1 | cut -c8-)
+ if [ -z "$2" ]; then
+ 
+     VERSION=`if [ -z "$WORKINGSETCHANGES" ]; then
+-        printf "0.%s.%s" $DATE $COMMITNO
++        printf "0.%s.%s" "$DATE" "$COMMITNO"
+     else
+-        printf "0.%s.%s-modified" $DATE $COMMITNO
++        printf "0.%s.%s-modified" "$DATE" "$COMMITNO"
+     fi`
+ 
+     VERSION_LONG=`if [ -z "$WORKINGSETCHANGES" ]; then
+-        printf "%s (%s)" $VERSION $COMMITREV
++        printf "%s (%s)" "$VERSION" "$COMMITREV"
+     else
+-        printf "%s (uncommited changes based on %s)" $VERSION $COMMITREV
++        printf "%s (uncommited changes based on %s)" "$VERSION" "$COMMITREV"
+     fi`
+ 
+ else
+@@ -34,9 +34,9 @@ fi
+ 
+ TMP_VERSION=$(mktemp -t "$(basename "$1").XXXXXX")
+ 
+-trap "rm -f $TMP_VERSION" EXIT
++trap "rm -f '$TMP_VERSION'" EXIT
+ 
+-cat << EOF > $TMP_VERSION
++cat << EOF > "$TMP_VERSION"
+ #pragma once
+ #include <string>
+ 
+@@ -45,8 +45,8 @@ namespace tdc {
+ }
+ EOF
+ 
+-if cmp --silent $1 $TMP_VERSION; then
+-    rm $TMP_VERSION
++if cmp --silent "$1" "$TMP_VERSION"; then
++    rm "$TMP_VERSION"
+ else
+-    cp $TMP_VERSION $1
++    cp "$TMP_VERSION" "$1"
+ fi
+-- 
+2.46.0
+
