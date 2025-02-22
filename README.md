@@ -28,9 +28,9 @@ Debug mode:
 just build-debug
 ```
 
-Executables are at `target/release/lzdr-comp` and `target/debug/lzdr-comp`.
+Executables are located at `target/release/lzdr-comp` and `target/debug/lzdr-comp` after the build process.
 
-- The executables expect input to parse from <STDIN>
+- The executables expect input to parse from `<STDIN>`
 - To compute the number of factors of all implemented algorithms, run one of the executables with parameter `--factors`
 - To restrict the computation to LZD+/LZDR, run with `-a [LZD+|LZDR]`
 - `target/debug/lzdr-comp` also outputs verbosely the constructed factors
